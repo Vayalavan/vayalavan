@@ -1,0 +1,30 @@
+{
+  "name": "vm-gateway-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BFF / API gateway for Vayalavan. The only publicly reachable service.",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "express": "^4.21.2",
+    "helmet": "^8.3.0",
+    "jose": "^6.2.8",
+    "pino": "^9.5.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2"
+  }
+}

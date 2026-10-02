@@ -1,0 +1,14 @@
+// Go workspace tying the Go services to the shared vm-go-common
+// package, so a change to common is picked up immediately without a
+// `replace` directive in every service's go.mod or a tagged release.
+//
+// vm-gateway-api is absent by design: it is the Node/TypeScript BFF.
+go 1.25.7
+
+use (
+	./packages/vm-go-common
+	./vm-catalog-api
+	./vm-events-consumer-api
+	./vm-orders-api
+	./vm-profile-api
+)

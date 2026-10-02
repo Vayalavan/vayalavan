@@ -1,0 +1,40 @@
+/*
+ * App stylesheet.
+ *
+ * The shared base — Tailwind layers, brand tokens, focus rings — lives in
+ * vm-ui-kit so all three apps look like one product. postcss-import inlines
+ * it before Tailwind runs (see postcss.config.js).
+ *
+ * App-specific styles go below the import, not in vm-ui-kit.
+ */
+@import "@vayal/ui-kit/styles.css";
+
+/*
+ * The storefront canvas.
+ *
+ * Cream rather than the console's near-white, so every white card has an
+ * edge without a border doing the work. Two soft glows — field green from the
+ * top left, gold from the right — keep a long page from reading as a flat
+ * sheet. Fixed, so they stay put while the produce scrolls over them.
+ */
+@layer base {
+  body {
+    @apply bg-cream-100;
+    background-image:
+      radial-gradient(60rem 36rem at -10% -10%, theme("colors.primary.100 / 55%"), transparent 60%),
+      radial-gradient(48rem 30rem at 110% 10%, theme("colors.gold.100 / 60%"), transparent 60%);
+    background-attachment: fixed;
+  }
+
+  :focus-visible {
+    @apply ring-offset-cream-100;
+  }
+
+  /* Headings in the display serif. Set here rather than on every <h1> so a
+     page added next month gets it without anyone remembering to. */
+  h1,
+  h2 {
+    @apply font-display;
+    font-optical-sizing: auto;
+  }
+}

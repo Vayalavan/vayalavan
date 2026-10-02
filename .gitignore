@@ -1,0 +1,56 @@
+# Real env files never enter the repo. Only .env.example is committed.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build output
+bin/
+dist/
+node_modules/
+*.tsbuildinfo
+
+# Local runtime state (pids, logs) written by `make dev`
+infra/.run/
+
+# Go
+*.test
+*.out
+coverage.out
+
+# Pinned dev tools (air, goose, sqlc) downloaded by `make -C infra tools`:
+# platform binaries, rebuilt on every machine by ./dev-setup.sh.
+.tools/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# air build output
+tmp/
+
+# Real production secrets
+.env.production
+
+# Local tool state. Records shell commands verbatim, which means a command that
+# ever contained a secret would carry it into the repo — this is exactly how
+# the Razorpay key secret nearly got committed.
+.claude/settings.local.json
+
+# vm-analytics-api (Python)
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Logs and coverage from any tool
+*.log
+coverage/
+
+# Key material never belongs in the repo, whatever directory it lands in.
+*.pem
+*.key
+*.p12
+*.p8
+*.jks

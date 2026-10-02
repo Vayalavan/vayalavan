@@ -1,0 +1,25 @@
+{
+  "name": "vayal-mikrogreenz",
+  "version": "0.1.0",
+  "private": true,
+  "description": "B2C marketplace for fresh fruits, vegetables and microgreens.",
+  "//": "npm workspaces so one `npm install` at the root wires the UIs and the gateway to the shared vm-ui-kit via symlink, with no publish step.",
+  "workspaces": [
+    "packages/vm-ui-kit",
+    "vm-gateway-api",
+    "vm-client-ui",
+    "vm-admin-ui",
+    "vm-supplier-ui",
+    "vm-analytics-ui"
+  ],
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

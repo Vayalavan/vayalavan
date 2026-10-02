@@ -1,0 +1,23 @@
+# Never ship secrets or local state into a build context.
+.env
+.env.*
+!.env.example
+
+node_modules
+**/node_modules
+**/dist
+**/tmp
+.tools
+.git
+.github
+
+# Local-only infrastructure and data
+infra/postgres/data
+*.log
+
+# Test and editor noise
+**/*.test.ts
+**/*_test.go
+.DS_Store
+.vscode
+.idea

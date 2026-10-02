@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# Backing services only: postgres, minio, mailhog.
+#
+# The four APIs and three UIs deliberately do NOT run here. They run natively
+# on the host with hot reload (air / tsx watch / vite), which is what makes
+# the edit-save-see loop fast — and what lets a single MinIO endpoint resolve
+# identically from a Go service and from the browser. See the README section
+# "Why one MinIO endpoint".
+#
+# Every value comes from the single root .env (see .env.example). The Makefile
+# passes it with --env-file ../.env.
+# ---------------------------------------------------------------------------
+
+name: ${COMPOSE_PROJECT_NAME:-vayal}
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_IMAGE_TAG:-16-alpine}
+    container_name: vayal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+      # Consumed by the init script to provision one role per service.
+      PROFILE_DB_USER: ${PROFILE_DB_USER:?PROFILE_DB_USER is required}
+      PROFILE_DB_PASSWORD: ${PROFILE_DB_PASSWORD:?PROFILE_DB_PASSWORD is required}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:?CATALOG_DB_USER is required}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?CATALOG_DB_PASSWORD is required}
+      ORDERS_DB_USER: ${ORDERS_DB_USER:?ORDERS_DB_USER is required}
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD:?ORDERS_DB_PASSWORD is required}
+      # The analytics schema and its roles (init/03-analytics.sh).
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:?ANALYTICS_DB_USER is required}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:?ANALYTICS_DB_PASSWORD is required}
+      ANALYTICS_READER_DB_USER: ${ANALYTICS_READER_DB_USER:?ANALYTICS_READER_DB_USER is required}
+      ANALYTICS_READER_DB_PASSWORD: ${ANALYTICS_READER_DB_PASSWORD:?ANALYTICS_READER_DB_PASSWORD is required}
+      EVENTS_CDC_DB_USER: ${EVENTS_CDC_DB_USER:?EVENTS_CDC_DB_USER is required}
+      EVENTS_CDC_DB_PASSWORD: ${EVENTS_CDC_DB_PASSWORD:?EVENTS_CDC_DB_PASSWORD is required}
+    # Logical replication for the analytics CDC stream (CLAUDE.md §5.4).
+    # max_slot_wal_keep_size caps the WAL a slot may pin: a consumer that is
+    # stopped for good would otherwise make Postgres keep every WAL segment
+    # until the disk is full. Past the cap the slot is invalidated instead,
+    # and the consumer must be re-seeded — a far better failure.
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+      - -c
+      - max_slot_wal_keep_size=2GB
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs once, only when pgdata is empty. `make reset` wipes the volume to
+      # force a re-run after editing these scripts.
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  minio:
+    image: minio/minio:${MINIO_IMAGE_TAG:-latest}
+    container_name: vayal-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+    ports:
+      # Published on the host so that "localhost:9000" is a single address
+      # meaning the same thing to vm-catalog-api and to the browser. This is
+      # what makes presigned URLs work with no rewriting.
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      # MinIO's own liveness endpoint, probed with the mc client shipped in
+      # the image. No bucket bootstrap container: vm-catalog-api creates the
+      # bucket on startup (CLAUDE.md §6.6), so there is one owner of that
+      # decision rather than two that can disagree.
+      test: ["CMD-SHELL", "mc ready local || exit 1"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  mailhog:
+    image: mailhog/mailhog:${MAILHOG_IMAGE_TAG:-latest}
+    container_name: vayal-mailhog
+    restart: unless-stopped
+    ports:
+      - "${MAILHOG_SMTP_PORT:-1025}:1025"
+      - "${MAILHOG_UI_PORT:-8025}:8025"
+
+volumes:
+  pgdata:
+  miniodata:

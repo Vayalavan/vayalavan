@@ -1,0 +1,27 @@
+# air — hot reload for vm-catalog-api.
+#
+# Rebuilds and restarts on save. Migrations are watched too (include_ext),
+# because editing a .sql file should rebuild the binary that embeds it.
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/api ./cmd/api"
+  entrypoint = "./tmp/api"
+  # Watch Go sources and embedded migrations.
+  include_ext = ["go", "sql"]
+  exclude_dir = ["tmp", "testdata"]
+  exclude_regex = ["_test\\.go"]
+  # Coalesce rapid saves into one rebuild.
+  delay = 300
+  stop_on_error = false
+  send_interrupt = true
+  # Give in-flight requests a moment to drain on restart.
+  kill_delay = "1s"
+
+[log]
+  # The process manager already prefixes and timestamps each line.
+  time = false
+
+[misc]
+  clean_on_exit = true

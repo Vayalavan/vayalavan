@@ -1,0 +1,47 @@
+/**
+ * Base stylesheet for all three Vayal UIs.
+ *
+ * Imported once per app, before the app's own styles. The colour values live
+ * in tailwind-preset.js; this file only wires Tailwind's layers and sets the
+ * handful of document-level defaults that are not expressible as utilities.
+ */
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Exposed as CSS variables for the few places a Tailwind class cannot
+       reach — e.g. a native form control's accent colour. */
+    --vayal-primary: theme("colors.primary.600");
+    --vayal-secondary: theme("colors.secondary.500");
+    --vayal-accent: theme("colors.accent.500");
+    --vayal-surface: theme("colors.surface.DEFAULT");
+  }
+
+  html {
+    /* Mobile-first per CLAUDE.md §3: the layout must work from 360px up. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-surface text-primary-950 font-sans antialiased;
+    /* Fill the viewport so a short page still paints the surface colour
+       rather than the browser's default white. */
+    min-height: 100dvh;
+  }
+
+  /* A visible, on-brand focus ring everywhere. Removing focus styles is the
+     single most common accessibility regression in a design system, so the
+     default is set once here rather than per component. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary-500 ring-offset-2 ring-offset-surface;
+  }
+
+  /* Native controls pick up the brand colour. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--vayal-primary);
+  }
+}

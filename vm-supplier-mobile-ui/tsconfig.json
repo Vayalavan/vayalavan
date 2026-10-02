@@ -1,0 +1,32 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "jsx": "react-jsx",
+    "types": [
+      "node"
+    ],
+    "paths": {
+      "expo-file-system/legacy": [
+        "./node_modules/expo-file-system/build/legacy/index.d.ts"
+      ]
+    }
+  },
+  "//paths": "expo-file-system has no `exports` map for its /legacy entry, so TypeScript resolves it to the package's own SOURCE (legacy.ts -> src/legacy/*.ts) and then typechecks it under OUR settings. It does not survive exactOptionalPropertyTypes, and a third-party file has no business failing our build. This points tsc at the declarations the package already ships — the same public surface an `exports` map would expose. Metro resolves legacy.ts at runtime and is unaffected.",
+  "include": [
+    "**/*.ts",
+    "**/*.tsx"
+  ],
+  "exclude": [
+    "node_modules",
+    "android",
+    "ios",
+    ".expo"
+  ]
+}

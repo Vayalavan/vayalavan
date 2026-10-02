@@ -1,0 +1,53 @@
+{
+  "name": "vm-client-mobile-ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Vayalavan — the Android/iOS customer storefront. Feature parity with vm-client-ui.",
+  "//workspaces": "Deliberately NOT a member of the root npm workspaces, for the same reason vm-supplier-mobile-ui is not: Expo pins its own React (19.1 here) and the three web UIs are on React 18.3, and hoisting both into one root node_modules gives npm a choice it resolves silently and differently on every machine. See README.md 'Why this is not an npm workspace'.",
+  "//sdk": "Pinned to Expo SDK 54, matched to vm-supplier-mobile-ui. 54 is the newest SDK the App Store and Play Store builds of Expo Go support, so it is the newest that runs on a real iPhone without a paid Apple Developer account. The two mobile apps move together: a developer with one Expo Go install must be able to run both. Change these versions only as a set, via `npx expo install --fix`.",
+  "main": "index.ts",
+  "scripts": {
+    "//port": "Metro's default 8081 is vm-profile-api's port, and 8090 is the supplier app's — so this one is 8091 and both phones' apps can run at once. Prefer `make -C infra mobile-client`, which reads MOBILE_CLIENT_METRO_PORT from the root .env; these are the fallback for running from this directory.",
+    "start": "expo start --port 8091",
+    "android": "expo run:android --port 8091",
+    "ios": "expo run:ios --port 8091",
+    "prebuild": "expo prebuild --clean",
+    "test": "node --import tsx --test \"src/**/*.test.ts\"",
+    "lint": "tsc --noEmit",
+    "doctor": "npx expo-doctor"
+  },
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
+    "@react-native-community/netinfo": "12.0.1",
+    "@react-navigation/bottom-tabs": "^7.18.16",
+    "@react-navigation/native": "^7.3.16",
+    "@react-navigation/native-stack": "^7.18.8",
+    "@tanstack/react-query": "^5.101.4",
+    "expo": "^57.0.21",
+    "expo-constants": "~57.0.17",
+    "expo-font": "~57.0.3",
+    "expo-secure-store": "~57.0.3",
+    "expo-splash-screen": "~57.0.8",
+    "expo-status-bar": "~57.0.1",
+    "expo-system-ui": "~57.0.3",
+    "expo-video": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-webview": "13.16.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.26.0",
+    "@types/node": "^22.10.2",
+    "@types/react": "~19.2.0",
+    "babel-preset-expo": "~57.0.11",
+    "dotenv": "^16.4.7",
+    "tsx": "^4.19.2",
+    "typescript": "~6.0.3"
+  },
+  "engines": {
+    "node": ">=20.12"
+  }
+}

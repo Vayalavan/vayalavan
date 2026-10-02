@@ -1,0 +1,361 @@
+# Production topology.
+#
+# The shape that matters here is the network split. Only the gateway and the
+# three static UIs touch `edge`; every Go service and Postgres live on
+# `internal`, which is marked `internal: true` so Docker gives it no route out
+# and no published ports. CLAUDE.md rule 5 says only the gateway is publicly
+# reachable — this makes that a property of the network rather than a promise.
+#
+# Postgres is defined here for a single-box deployment. Each service's
+# connection string is BUILT from the same <SERVICE>_DB_USER / _DB_PASSWORD
+# the postgres service provisions its role with, so a role and the URL that
+# logs in as it cannot disagree — the failure that used to be possible when
+# the password lived in two places.
+#
+# On a managed database (RDS, Cloud SQL, Neon), delete the `postgres` service,
+# create the roles with infra/postgres/init/*.sh's SQL, and set the full
+# *_DATABASE_URL variables instead: each one, when set, replaces the built
+# URL and its parts are no longer needed.
+#
+#   docker compose -f docker-compose.prod.yml --env-file ../.env.production up -d
+#
+# Run it behind a TLS terminator (Caddy, nginx, a cloud load balancer). Nothing
+# in this file terminates TLS, and the gateway must never be exposed on :80
+# directly to the internet.
+
+name: vayal-prod
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  # A crash loop must not fill the disk with logs and take the host down too.
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  # Read-only root filesystem: nothing here writes to disk, and a writable
+  # container filesystem is where a compromised process stages tools.
+  read_only: true
+  tmpfs:
+    - /tmp
+  security_opt:
+    - no-new-privileges:true
+
+networks:
+  edge:
+  internal:
+    # No route to or from the outside world. A Go service cannot be reached
+    # from the internet even if a port were published by mistake.
+    internal: true
+
+volumes:
+  postgres-data:
+  minio-data:
+
+services:
+  # --- data ----------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-vayal}
+      # One login role per service, created by init/01-init.sh and checked
+      # by init/02-verify-isolation.sh. Required: without them first boot
+      # fails half-provisioned.
+      PROFILE_DB_USER: ${PROFILE_DB_USER:?set PROFILE_DB_USER}
+      PROFILE_DB_PASSWORD: ${PROFILE_DB_PASSWORD:?set PROFILE_DB_PASSWORD}
+      CATALOG_DB_USER: ${CATALOG_DB_USER:?set CATALOG_DB_USER}
+      CATALOG_DB_PASSWORD: ${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}
+      ORDERS_DB_USER: ${ORDERS_DB_USER:?set ORDERS_DB_USER}
+      ORDERS_DB_PASSWORD: ${ORDERS_DB_PASSWORD:?set ORDERS_DB_PASSWORD}
+      ANALYTICS_DB_USER: ${ANALYTICS_DB_USER:?set ANALYTICS_DB_USER}
+      ANALYTICS_DB_PASSWORD: ${ANALYTICS_DB_PASSWORD:?set ANALYTICS_DB_PASSWORD}
+      ANALYTICS_READER_DB_USER: ${ANALYTICS_READER_DB_USER:?set ANALYTICS_READER_DB_USER}
+      ANALYTICS_READER_DB_PASSWORD: ${ANALYTICS_READER_DB_PASSWORD:?set ANALYTICS_READER_DB_PASSWORD}
+      EVENTS_CDC_DB_USER: ${EVENTS_CDC_DB_USER:?set EVENTS_CDC_DB_USER}
+      EVENTS_CDC_DB_PASSWORD: ${EVENTS_CDC_DB_PASSWORD:?set EVENTS_CDC_DB_PASSWORD}
+    # Logical replication for the analytics CDC stream; see docker-compose.yml.
+    command: ["postgres", "-c", "wal_level=logical", "-c", "max_replication_slots=10",
+              "-c", "max_wal_senders=10", "-c", "max_slot_wal_keep_size=2GB"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      # Creates the schemas and their owning roles (01), refuses to start if
+      # any role can reach another's schema (02), and provisions the analytics
+      # schema and its three roles (03).
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY:?set S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY:?set S3_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  # --- Go services (internal only) -----------------------------------------
+  profile-api:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-profile-api/Dockerfile
+      args: { SERVICE: vm-profile-api }
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      PORT: 8081
+      PROFILE_DATABASE_URL: ${PROFILE_DATABASE_URL:-postgres://${PROFILE_DB_USER:?set PROFILE_DB_USER}:${PROFILE_DB_PASSWORD:?set PROFILE_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable&search_path=profile,public}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      JWT_ACCESS_TTL_MIN: ${JWT_ACCESS_TTL_MIN:-15}
+      JWT_REFRESH_TTL_DAYS: ${JWT_REFRESH_TTL_DAYS:-30}
+      BCRYPT_COST: ${BCRYPT_COST:-12}
+      # Supplier onboarding mail: profile-api sends admin-created suppliers a
+      # set-password link, so it needs the relay and the supplier UI's address.
+      # Required by its config — without them it refuses to start.
+      SMTP_HOST: ${SMTP_HOST:?set SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM:?set SMTP_FROM}
+      SUPPLIER_APP_URL: ${SUPPLIER_APP_URL:?set SUPPLIER_APP_URL}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  catalog-api:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-catalog-api/Dockerfile
+      args: { SERVICE: vm-catalog-api }
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      PORT: 8082
+      CATALOG_DATABASE_URL: ${CATALOG_DATABASE_URL:-postgres://${CATALOG_DB_USER:?set CATALOG_DB_USER}:${CATALOG_DB_PASSWORD:?set CATALOG_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable&search_path=catalog,public}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN}
+      PROFILE_API_URL: http://profile-api:8081
+      STORAGE_PROVIDER: ${STORAGE_PROVIDER:-minio}
+      S3_ENDPOINT: ${S3_ENDPOINT:-http://minio:9000}
+      S3_REGION: ${S3_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:?set S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-true}
+      MAX_IMAGE_BYTES: ${MAX_IMAGE_BYTES:-5242880}
+      MAX_CSV_BYTES: ${MAX_CSV_BYTES:-5242880}
+      MAX_CSV_ROWS: ${MAX_CSV_ROWS:-2000}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+      minio: { condition: service_started }
+
+  orders-api:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-orders-api/Dockerfile
+      args: { SERVICE: vm-orders-api }
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      PORT: 8083
+      ORDERS_DATABASE_URL: ${ORDERS_DATABASE_URL:-postgres://${ORDERS_DB_USER:?set ORDERS_DB_USER}:${ORDERS_DB_PASSWORD:?set ORDERS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable&search_path=orders,public}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN}
+      PROFILE_API_URL: http://profile-api:8081
+      CATALOG_API_URL: http://catalog-api:8082
+      PLATFORM_FEE_BPS: ${PLATFORM_FEE_BPS:-300}
+      DELIVERY_FEE_PAISE: ${DELIVERY_FEE_PAISE:-1500}
+      ORDER_CUTOFF_HOUR_IST: ${ORDER_CUTOFF_HOUR_IST:-16}
+      RESERVATION_TTL_MINUTES: ${RESERVATION_TTL_MINUTES:-15}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET}
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM: ${SMTP_FROM}
+      SUPPORT_EMAIL: ${SUPPORT_EMAIL:-vayal.mikrogreenz@gmail.com}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # --- analytics (CLAUDE.md §5.4) -------------------------------------------
+  #
+  # The CDC consumer: reads the supplier/product/order event stream by logical
+  # replication and writes the analytics schema. Two database roles, on
+  # purpose: a REPLICATION login that can read the WAL and nothing else, and
+  # the analytics writer that can write one schema and nothing else.
+  events-consumer:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-events-consumer-api/Dockerfile
+      args: { SERVICE: vm-events-consumer-api }
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      EVENTS_CONSUMER_PORT: 8084
+      # Read by the image's HEALTHCHECK, like PORT on the other Go services.
+      PORT: 8084
+      EVENTS_CONSUMER_DATABASE_URL: ${EVENTS_CONSUMER_DATABASE_URL:-postgres://${ANALYTICS_DB_USER:?set ANALYTICS_DB_USER}:${ANALYTICS_DB_PASSWORD:?set ANALYTICS_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable&search_path=analytics,public}
+      EVENTS_CONSUMER_REPLICATION_URL: ${EVENTS_CONSUMER_REPLICATION_URL:-postgres://${EVENTS_CDC_DB_USER:?set EVENTS_CDC_DB_USER}:${EVENTS_CDC_DB_PASSWORD:?set EVENTS_CDC_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable&replication=database}
+      CDC_SLOT_NAME: ${CDC_SLOT_NAME:-vayal_analytics}
+      CDC_PUBLICATION: ${CDC_PUBLICATION:-vayal_analytics}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # Read-only reports over the analytics schema, as the analytics READER role.
+  analytics-api:
+    <<: *service-defaults
+    build:
+      context: ../vm-analytics-api
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      ANALYTICS_API_PORT: 8085
+      ANALYTICS_API_DATABASE_URL: ${ANALYTICS_API_DATABASE_URL:-postgres://${ANALYTICS_READER_DB_USER:?set ANALYTICS_READER_DB_USER}:${ANALYTICS_READER_DB_PASSWORD:?set ANALYTICS_READER_DB_PASSWORD}@postgres:5432/${POSTGRES_DB:-vayal}?sslmode=disable}
+      DB_MAX_CONNS: ${DB_MAX_CONNS:-10}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:?set INTERNAL_SERVICE_TOKEN}
+    networks: [internal]
+    depends_on:
+      postgres: { condition: service_healthy }
+
+  # --- the only public service ---------------------------------------------
+  gateway:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-gateway-api/Dockerfile
+    environment:
+      APP_ENV: production
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      TZ: Asia/Kolkata
+      PORT: 8080
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:?set CORS_ALLOWED_ORIGINS}
+      PROFILE_API_URL: http://profile-api:8081
+      CATALOG_API_URL: http://catalog-api:8082
+      ORDERS_API_URL: http://orders-api:8083
+      ANALYTICS_API_URL: http://analytics-api:8085
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN}
+      RATE_LIMIT_WINDOW_MS: ${RATE_LIMIT_WINDOW_MS:-60000}
+      RATE_LIMIT_MAX: ${RATE_LIMIT_MAX:-600}
+    # Bound to loopback: the TLS terminator on the host proxies to it. Binding
+    # 0.0.0.0 would publish plain HTTP to the internet.
+    ports:
+      - "127.0.0.1:${GATEWAY_PUBLIC_PORT:-8080}:8080"
+    networks: [edge, internal]
+    depends_on:
+      profile-api: { condition: service_started }
+      catalog-api: { condition: service_started }
+      orders-api: { condition: service_started }
+      analytics-api: { condition: service_started }
+
+  # --- static UIs ----------------------------------------------------------
+  #
+  # VITE_API_BASE_URL is baked in at build time, so each of these must be
+  # rebuilt (not just restarted) to point at a different API.
+  client-ui:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-client-ui/Dockerfile
+      args:
+        APP: vm-client-ui
+        VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL:?set PUBLIC_API_BASE_URL}
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-vayal.mikrogreenz@gmail.com}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Vayalavan}
+        VITE_RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+    # nginx writes its cache and pid under /var; read_only would break it.
+    read_only: false
+    ports:
+      - "127.0.0.1:${CLIENT_PUBLIC_PORT:-8090}:80"
+    networks: [edge]
+
+  admin-ui:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-admin-ui/Dockerfile
+      args:
+        APP: vm-admin-ui
+        VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-vayal.mikrogreenz@gmail.com}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Vayalavan}
+        # The Analytics section is loaded from analytics-ui at runtime.
+        VITE_ANALYTICS_REMOTE_URL: ${ANALYTICS_UI_PUBLIC_URL:?set ANALYTICS_UI_PUBLIC_URL}remoteEntry.js
+    read_only: false
+    ports:
+      - "127.0.0.1:${ADMIN_PUBLIC_PORT:-8091}:80"
+    networks: [edge]
+
+  # A Module Federation remote, not a site anyone visits: admin-ui fetches
+  # its remoteEntry.js and renders the Analytics section from it. Deployed on
+  # its own so analytics ships without rebuilding the console — but a change to
+  # the shared contract (vm-admin-ui/src/remotes.d.ts) needs both.
+  analytics-ui:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-analytics-ui/Dockerfile
+      args:
+        APP: vm-analytics-ui
+        NGINX_CONF: analytics.conf
+        ANALYTICS_UI_PUBLIC_URL: ${ANALYTICS_UI_PUBLIC_URL:?set ANALYTICS_UI_PUBLIC_URL}
+        VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-vayal.mikrogreenz@gmail.com}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Vayalavan}
+    read_only: false
+    ports:
+      - "127.0.0.1:${ANALYTICS_PUBLIC_PORT:-8093}:80"
+    networks: [edge]
+
+  supplier-ui:
+    <<: *service-defaults
+    build:
+      context: ..
+      dockerfile: vm-supplier-ui/Dockerfile
+      args:
+        APP: vm-supplier-ui
+        VITE_API_BASE_URL: ${PUBLIC_API_BASE_URL}
+        VITE_SUPPORT_EMAIL: ${SUPPORT_EMAIL:-vayal.mikrogreenz@gmail.com}
+        VITE_APP_NAME: ${VITE_APP_NAME:-Vayalavan}
+    read_only: false
+    ports:
+      - "127.0.0.1:${SUPPLIER_PUBLIC_PORT:-8092}:80"
+    networks: [edge]

@@ -1,0 +1,15 @@
+{
+  "//": "Emits .d.ts only — Vite produces the JavaScript. Kept separate from tsconfig.json so `npm run lint` can typecheck vite.config.ts without emitting declarations for it.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
+    "declarationMap": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "//exclude": "Tests are not part of the published surface; without this, dist would carry a .d.ts for every test file.",
+  "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
+}

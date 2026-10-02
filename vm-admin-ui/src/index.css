@@ -1,0 +1,10 @@
+/*
+ * App stylesheet.
+ *
+ * The shared base — Tailwind layers, brand tokens, focus rings — lives in
+ * vm-ui-kit so all three apps look like one product. postcss-import inlines
+ * it before Tailwind runs (see postcss.config.js).
+ *
+ * App-specific styles go below the import, not in vm-ui-kit.
+ */
+@import "@vayal/ui-kit/styles.css";

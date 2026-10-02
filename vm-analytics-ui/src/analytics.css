@@ -1,0 +1,9 @@
+/*
+ * The remote's own utilities, shipped with the exposed module.
+ *
+ * No `@tailwind base`: the host page already has the reset and the brand
+ * base from @vayal/ui-kit, and a second copy injected mid-page would restyle
+ * the console around it. Only the classes this app uses are emitted.
+ */
+@tailwind components;
+@tailwind utilities;
