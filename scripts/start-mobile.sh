@@ -5,13 +5,13 @@
 #   vm-supplier-mobile-ui   "Vayalavan Supplier"      the grower's app
 #   vm-client-mobile-ui     "Vayalavan"   the customer's app
 #
-# The counterpart to ./start.sh, which owns the backend and the three web UIs.
+# The counterpart to ./scripts/start.sh, which owns the backend and the three web UIs.
 # This starts NOTHING but an Expo dev server. It never starts, stops, seeds or
-# migrates anything server-side — that is ./start.sh's job and duplicating it
+# migrates anything server-side — that is ./scripts/start.sh's job and duplicating it
 # here would give two scripts an opinion about the same processes.
 #
 # It does CHECK that the gateway is up, because the app is useless without it
-# and a warning here is cheaper than a spinner on a handset. Run ./start.sh in
+# and a warning here is cheaper than a spinner on a handset. Run ./scripts/start.sh in
 # another terminal first, then this one alongside it.
 #
 # It exists because every failure these apps have had on a real handset was
@@ -23,19 +23,20 @@
 # run at once — in two terminals, one each. They share MOBILE_API_BASE_URL,
 # because there is one gateway.
 #
-#   ./start-mobile.sh                start the SUPPLIER app (the default)
-#   ./start-mobile.sh customer       start the CUSTOMER app
-#   ./start-mobile.sh supplier       the default, spelled out
-#   ./start-mobile.sh customer --ios also open the iOS simulator (needs Xcode)
-#   ./start-mobile.sh --tunnel       route Metro through a public tunnel (see below)
-#   ./start-mobile.sh --android      also open an Android emulator (needs the SDK)
-#   ./start-mobile.sh --clear        start with an empty Metro cache
-#   ./start-mobile.sh --keep-url     do not touch MOBILE_API_BASE_URL
-#   ./start-mobile.sh --stop         free BOTH Metro ports and exit
+#   ./scripts/start-mobile.sh                start the SUPPLIER app (the default)
+#   ./scripts/start-mobile.sh customer       start the CUSTOMER app
+#   ./scripts/start-mobile.sh supplier       the default, spelled out
+#   ./scripts/start-mobile.sh customer --ios also open the iOS simulator (needs Xcode)
+#   ./scripts/start-mobile.sh --tunnel       route Metro through a public tunnel (see below)
+#   ./scripts/start-mobile.sh --android      also open an Android emulator (needs the SDK)
+#   ./scripts/start-mobile.sh --clear        start with an empty Metro cache
+#   ./scripts/start-mobile.sh --keep-url     do not touch MOBILE_API_BASE_URL
+#   ./scripts/start-mobile.sh --stop         free BOTH Metro ports and exit
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The repository root: this script lives in scripts/.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; }
@@ -65,7 +66,7 @@ free_metro_port() {
 
 # --- which app? ------------------------------------------------------------
 #
-# Defaults to the supplier app: it was here first and it is what "./start-mobile.sh"
+# Defaults to the supplier app: it was here first and it is what "./scripts/start-mobile.sh"
 # has meant in every note and every habit built up so far. The customer app is
 # always named explicitly.
 APP_KEY="supplier"
@@ -110,7 +111,7 @@ if [ "$APP_KEY" = "customer" ]; then
     APP_NAME="Vayalavan (customer)"
     PORT="$CUSTOMER_PORT"
     OTHER_PORT="$SUPPLIER_PORT"
-    OTHER_HINT="./start-mobile.sh supplier"
+    OTHER_HINT="./scripts/start-mobile.sh supplier"
     SIGN_IN_EMAIL="customer@vayal.test"
     SIGN_IN_VAR="SEED_CUSTOMER_PASSWORD"
     SIGN_IN_NOTE="Browsing needs no account — sign in only to order."
@@ -119,7 +120,7 @@ else
     APP_NAME="Vayalavan Supplier"
     PORT="$SUPPLIER_PORT"
     OTHER_PORT="$CUSTOMER_PORT"
-    OTHER_HINT="./start-mobile.sh customer"
+    OTHER_HINT="./scripts/start-mobile.sh customer"
     SIGN_IN_EMAIL="greens@vayal.test"
     SIGN_IN_VAR="SEED_SUPPLIER_PASSWORD"
     SIGN_IN_NOTE="This app is sign-in only."
@@ -130,7 +131,7 @@ cd "$APP"
 
 # --- 1. environment --------------------------------------------------------
 bold "Starting $APP_NAME"
-[ -f "$ROOT/.env" ] || die ".env is missing. Copy it with:  cp .env.example .env"
+[ -f "$ROOT/.env" ] || die ".env is missing. Create it with:  ./scripts/dev-setup.sh"
 ok ".env found"
 
 if [ "$PORT" = "$OTHER_PORT" ]; then
@@ -179,7 +180,7 @@ if curl -fsS -m 5 -o /dev/null "http://localhost:${GATEWAY_PORT}/readyz" 2>/dev/
     ok "gateway is up on :${GATEWAY_PORT}"
 else
     warn "the gateway is NOT responding on :${GATEWAY_PORT}"
-    warn "the app will load but every request will fail — start it with ./start.sh"
+    warn "the app will load but every request will fail — start it with ./scripts/start.sh"
 fi
 
 # Prove the API answers on the address the PHONE will use, not just on
@@ -241,7 +242,7 @@ cat <<EOF
   (password = ${SIGN_IN_VAR} in .env)
   ${SIGN_IN_NOTE}
 
-  Stop with Ctrl-C, or ./start-mobile.sh --stop
+  Stop with Ctrl-C, or ./scripts/start-mobile.sh --stop
 
 EOF
 

@@ -38,6 +38,8 @@ started until every P0 item is done and tested.
 ```
 vayal-mikrogreenz/
   README.md
+  scripts/                # the commands people run: dev-setup, start, start-mobile
+                          # (macOS) and their -ubuntu wrappers
   infra/                  # docker-compose, migrations runner, seed data, Makefile
   packages/
     vm-go-common/         # Go: config, logging, errors, auth middleware, db, money, ist-time

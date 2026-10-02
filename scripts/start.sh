@@ -8,10 +8,10 @@
 # this adds is the part a Makefile is bad at — waiting until things are
 # genuinely reachable, and telling you what to open.
 #
-#   ./start.sh            start the stack
-#   ./start.sh --reset    wipe the database and reseed first
-#   ./start.sh --tunnel   also publish the gateway, so Razorpay can call back
-#   ./start.sh --stop     stop everything
+#   ./scripts/start.sh            start the stack
+#   ./scripts/start.sh --reset    wipe the database and reseed first
+#   ./scripts/start.sh --tunnel   also publish the gateway, so Razorpay can call back
+#   ./scripts/start.sh --stop     stop everything
 #
 # --tunnel exists because Razorpay cannot reach localhost, and the webhook is
 # the only thing that marks an order paid (CLAUDE.md §6.4). Without a public
@@ -23,7 +23,7 @@
 # The tunnel outlives a restart on purpose: it is bound to the gateway's port,
 # not its processes, and a quick tunnel's hostname dies with the process and
 # cannot be recovered — so killing it would mean re-registering the webhook in
-# the dashboard every time. `./start.sh --stop` is what takes it down.
+# the dashboard every time. `./scripts/start.sh --stop` is what takes it down.
 #
 # That hostname is still random per cloudflared process. For a stable one,
 # registered once, set in .env:
@@ -33,7 +33,8 @@
 #
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The repository root: this script lives in scripts/.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOG="${TMPDIR:-/tmp}/vayal-dev.log"
 
 bold() { printf "\033[1m%s\033[0m\n" "$1"; }
@@ -345,7 +346,7 @@ bold "Checking your environment"
 if ! make -C infra doctor >/dev/null 2>&1; then
     warn "make doctor reported problems:"
     make -C infra doctor || true
-    die "fix the above, then run ./start.sh again"
+    die "fix the above, then run ./scripts/start.sh again"
 fi
 ok "tooling, ports and .env look good"
 
@@ -372,7 +373,7 @@ if [ "$RESET" -eq 1 ]; then
     ok "database wiped, migrated and reseeded"
 else
     make -C infra migrate-up >/dev/null 2>&1 && ok "migrations up to date" \
-        || warn "migrations did not run — try ./start.sh --reset"
+        || warn "migrations did not run — try ./scripts/start.sh --reset"
 fi
 
 # --- 5. the apps -----------------------------------------------------------
@@ -481,7 +482,7 @@ if [ -n "$PUBLIC_URL" ]; then
 EOF
     if [ -z "$(env_value DEV_TUNNEL_NAME)$(env_value DEV_TUNNEL_HOSTNAME)" ]; then
         warn "that hostname belongs to this cloudflared process. It survives"
-        warn "./start.sh restarts, but ./start.sh --stop burns it for good and the"
+        warn "./scripts/start.sh restarts, but ./scripts/start.sh --stop burns it for good and the"
         warn "next one differs. DEV_TUNNEL_NAME / DEV_TUNNEL_HOSTNAME pin a fixed"
         warn "one you register once — see .env.example."
         echo
@@ -492,6 +493,6 @@ echo "  Logs    tail -f $LOG"
 if [ -n "$PUBLIC_URL" ]; then
     echo "  Tunnel  tail -f $TUNNEL_LOG"
 fi
-echo "  Stop    ./start.sh --stop"
+echo "  Stop    ./scripts/start.sh --stop"
 echo
 

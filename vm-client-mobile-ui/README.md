@@ -15,17 +15,17 @@ what is different here.
 
 ## Quick start
 
-Two terminals. The backend belongs to `./start.sh`; this app belongs to
-`./start-mobile.sh customer`.
+Two terminals. The backend belongs to `./scripts/start.sh`; this app belongs to
+`./scripts/start-mobile.sh customer`.
 
 ```bash
-./start.sh                     # terminal 1 — Postgres, the APIs, the three web UIs
-./start-mobile.sh customer     # terminal 2 — this app's Expo dev server
+./scripts/start.sh                     # terminal 1 — Postgres, the APIs, the three web UIs
+./scripts/start-mobile.sh customer     # terminal 2 — this app's Expo dev server
 ```
 
 Then scan the QR code with Expo Go.
 
-`./start-mobile.sh` with no argument starts the **supplier** app; this one is
+`./scripts/start-mobile.sh` with no argument starts the **supplier** app; this one is
 always named. Both can run at once — they have separate Metro ports (8090 and
 8091) and share one `MOBILE_API_BASE_URL`, because there is one gateway.
 

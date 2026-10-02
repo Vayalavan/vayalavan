@@ -18,15 +18,15 @@ listing, and a session that survives being backgrounded all morning.
 
 ## Quick start
 
-Two terminals. The backend belongs to `./start.sh`; this app belongs to
-`./start-mobile.sh`, and neither touches the other's processes.
+Two terminals. The backend belongs to `./scripts/start.sh`; this app belongs to
+`./scripts/start-mobile.sh`, and neither touches the other's processes.
 
 ```bash
-./start.sh          # terminal 1 — Postgres, the APIs, the three web UIs
-./start-mobile.sh   # terminal 2 — just the Expo dev server
+./scripts/start.sh          # terminal 1 — Postgres, the APIs, the three web UIs
+./scripts/start-mobile.sh   # terminal 2 — just the Expo dev server
 ```
 
-With no argument that script starts THIS app. `./start-mobile.sh customer`
+With no argument that script starts THIS app. `./scripts/start-mobile.sh customer`
 starts the storefront app instead, on its own Metro port.
 
 Then scan the QR code with Expo Go.

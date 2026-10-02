@@ -267,7 +267,7 @@ every schema including `analytics`, then creates the publication **and the
 replication slot**. The slot is made here rather than by the consumer: a slot
 only sees changes made after it exists, so events written before the
 consumer's first start (a backfill, the first orders after a deploy) would
-otherwise be lost. On a new machine, `./dev-setup.sh` does all of this plus
+otherwise be lost. On a new machine, `./scripts/dev-setup.sh` does all of this plus
 the backfill.
 
 **Backfill** existing suppliers, products and orders. They take the same CDC

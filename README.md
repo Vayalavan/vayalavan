@@ -18,27 +18,49 @@ domain endpoints or tables yet — see [What exists today](#what-exists-today).
 
 ## First five minutes
 
+All the commands a person runs live in `scripts/`. One set for macOS, and an
+`-ubuntu` set for Ubuntu:
+
+| | macOS | Ubuntu |
+|---|---|---|
+| Set up, once (and after pulling) | `./scripts/dev-setup.sh` | `./scripts/dev-setup-ubuntu.sh` |
+| Run everything | `./scripts/start.sh` | `./scripts/start-ubuntu.sh` |
+| Run a mobile app's dev server | `./scripts/start-mobile.sh [customer]` | `./scripts/start-mobile-ubuntu.sh [customer]` |
+
 ```bash
 git clone <repo> && cd vayal-mikrogreenz
-./dev-setup.sh                # once: checks prerequisites, .env, every app's deps,
+./scripts/dev-setup.sh        # once: prerequisites, .env, every app's deps,
                               # Docker infra, migrations, seed, analytics backfill
-./start.sh                    # every time: runs all 10 processes, prints the URLs
+./scripts/start.sh            # every time: runs all 10 processes, prints the URLs
 ```
 
-`./dev-setup.sh` lists its prerequisites at the top and stops with the fix if
-one is missing: **Go 1.25+, Node 20.12+, Docker (running), uv**. It creates
-`.env` by copying `test.env`, the team's committed development settings. Keep
-`test.env` free of secrets: mail goes to MailHog and the Razorpay keys are
-placeholders, so real keys belong only in your own `.env`, which stays
-gitignored. The script never modifies `test.env`, and an existing `.env` is
-left alone. While copying, it swaps the LAN
-address `test.env` was made on (used by `S3_ENDPOINT` and
-`MOBILE_API_BASE_URL`) for this machine's own, so product images and the
-mobile apps work there too. Set `IP=192.168.1.40 ./dev-setup.sh` to choose the
-address yourself. After moving to another network, `make -C infra mobile-ip`
-repoints an existing `.env`. It is safe to re-run after pulling: migrations
-and seed are idempotent. `--with-mobile` also
-installs the Expo apps; `--reset` rebuilds the database from scratch.
+**Prerequisites:** Go 1.25+, Node 20.12+, Docker (running) and uv. Each setup
+script lists them at the top, with the exact install commands for that OS, and
+stops with the fix if one is missing.
+
+**Ubuntu differences:**
+- **Install commands:** Go comes from snap and Node from NodeSource; Ubuntu's own
+  packages of both are too old.
+- **Docker without sudo:** add yourself to the `docker` group, then log out and
+  back in.
+- **File-watch limit:** raise it, or ten dev servers crash with ENOSPC.
+- **How it works:** the Ubuntu scripts check these things, then run the same
+  shared scripts with an `ss`-based `lsof` (`infra/scripts/ubuntu/`) and the
+  detected LAN address. A fix to the shared scripts applies to both systems.
+
+**`.env` comes from `test.env`,** the team's committed development settings:
+- **No secrets:** mail goes to MailHog and the Razorpay keys are placeholders.
+  Real keys belong only in your own `.env`, which stays gitignored.
+- **Copied once:** setup never modifies `test.env` and never overwrites an
+  existing `.env`.
+- **Network address swapped:** while copying, setup replaces the LAN address
+  `test.env` was made on (used by `S3_ENDPOINT` and `MOBILE_API_BASE_URL`) with
+  this machine's own, so product images and the mobile apps work here too.
+  `IP=192.168.1.40 ./scripts/dev-setup.sh` chooses the address yourself;
+  `make -C infra mobile-ip` repoints an existing `.env` after a network change.
+
+Re-running setup is safe: migrations and seed are idempotent. `--with-mobile`
+also installs the Expo apps, and `--reset` rebuilds the database from scratch.
 
 The pieces it is made of still work on their own:
 
@@ -560,17 +582,18 @@ without either from booting it.
 The scripts split the same way, and neither touches the other's processes:
 
 ```bash
-./start.sh                    # terminal 1 — backend + the three web UIs
-./start-mobile.sh             # terminal 2 — the SUPPLIER app's Expo server
-./start-mobile.sh customer    # terminal 3 — the CUSTOMER app's, on its own port
+./scripts/start.sh                  # terminal 1 — backend + the web UIs
+./scripts/start-mobile.sh           # terminal 2 — the SUPPLIER app's Expo server
+./scripts/start-mobile.sh customer  # terminal 3 — the CUSTOMER app's, on its own port
+# on Ubuntu: start-ubuntu.sh / start-mobile-ubuntu.sh, same arguments
 ```
 
-`./start-mobile.sh` re-points `MOBILE_API_BASE_URL` at this machine's current
+`./scripts/start-mobile.sh` re-points `MOBILE_API_BASE_URL` at this machine's current
 LAN address before it starts, which is the thing that goes stale every time the
 laptop changes network — on a handset, `localhost` is the handset. Both apps
 read that one variable, so fixing it for one fixes it for both; everything else,
 including the Metro port, is per app so the two can run side by side.
-`./start-mobile.sh --stop` frees both.
+`./scripts/start-mobile.sh --stop` frees both.
 
 ### Running one service by hand
 
@@ -622,7 +645,7 @@ Verified working:
   tooling, same gateway: browse today's produce, cart, checkout, orders and the
   three-milestone timeline. Its own Metro port (8091) so both mobile apps can
   run at once. Browsing works signed out; sign-in is a modal at the point of
-  ordering. `expo-doctor` passes 18/18, and `./start-mobile.sh customer` starts
+  ordering. `expo-doctor` passes 18/18, and `./scripts/start-mobile.sh customer` starts
   it.
 
 ### Analytics pipeline and the analyst role
@@ -870,12 +893,12 @@ exists; activation gates only live keys and real settlement.
    the app. Start the stack with a tunnel in front of the gateway:
 
    ```sh
-   ./start.sh --tunnel
+   ./scripts/start.sh --tunnel
    ```
 
    That runs `cloudflared` (or `ngrok`, whichever is installed — `brew install
    cloudflared` if neither), waits until the public hostname actually answers
-   `/healthz`, and prints the webhook URL to register. `./start.sh --stop`
+   `/healthz`, and prints the webhook URL to register. `./scripts/start.sh --stop`
    takes it down again. To run one by hand instead:
 
    ```sh
@@ -887,9 +910,9 @@ exists; activation gates only live keys and real settlement.
    `payment.failed` and `refund.processed`, and set the secret to
    `RAZORPAY_WEBHOOK_SECRET`.
 
-   The tunnel **survives `./start.sh` restarts** on purpose — it is bound to
+   The tunnel **survives `./scripts/start.sh` restarts** on purpose — it is bound to
    the gateway's port, not to its processes, so it reconnects on its own and
-   the registered URL keeps working. `./start.sh --stop` is what takes it down,
+   the registered URL keeps working. `./scripts/start.sh --stop` is what takes it down,
    and a quick tunnel's hostname dies with the process: the next one is
    different and the dashboard needs re-pointing. Setting `DEV_TUNNEL_NAME` (a
    cloudflared named tunnel) or `DEV_TUNNEL_HOSTNAME` (an ngrok reserved
@@ -904,12 +927,12 @@ exists; activation gates only live keys and real settlement.
      quick tunnel whose control stream keeps failing, and cloudflared then
      retries forever against a hostname that no longer resolves — so `pgrep`
      shows it running while Razorpay rejects the URL with `no such host`.
-     Re-run `./start.sh --tunnel`: it probes the running tunnel, replaces it if
+     Re-run `./scripts/start.sh --tunnel`: it probes the running tunnel, replaces it if
      it has stopped answering, and prints the new URL to register. The
      transport defaults to `http2` (`DEV_TUNNEL_PROTOCOL`) because QUIC is what
      collapses on networks that idle-drop UDP.
    - **The dashboard points at an older hostname.** Only the URL that
-     `./start.sh --tunnel` last printed is live; delete the stale entries. The signature is verified over the **raw** body,
+     `./scripts/start.sh --tunnel` last printed is live; delete the stale entries. The signature is verified over the **raw** body,
    so the webhook route must keep its raw-body handling.
 
 3. Pay with a test card: **4111 1111 1111 1111**, any future expiry, any CVV,
@@ -1005,8 +1028,9 @@ vayal-mikrogreenz/
 │   ├── Makefile              # the developer entrypoint
 │   ├── docker-compose.yml    # postgres, minio, mailhog — nothing else
 │   ├── postgres/init/        # database, schemas, per-service roles
-│   ├── scripts/              # doctor, run, wait, seed, status
+│   ├── scripts/              # doctor, run, wait, seed, status; ubuntu/ helpers
 │   └── seed/                 # development seed data
+├── scripts/                  # what people run: dev-setup, start, start-mobile (+ -ubuntu)
 ├── packages/
 │   ├── vm-go-common/         # config, logging, httpx, db, migrate, money, isttime
 │   └── vm-ui-kit/            # logo, Tailwind preset, shell, API client

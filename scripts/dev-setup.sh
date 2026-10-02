@@ -2,18 +2,18 @@
 #
 # One-time (and safely repeatable) setup of a development machine.
 #
-# Takes a fresh copy of the repository to "./start.sh works": checks the
+# Takes a fresh copy of the repository to "./scripts/start.sh works": checks the
 # prerequisites, creates .env from test.env, installs every app's dependencies, starts
 # Postgres/MinIO/MailHog, provisions the database (schemas, roles, migrations,
 # analytics publication and slot), seeds it, and fills analytics from the seed.
 #
-#   ./dev-setup.sh                 set up (or bring an existing checkout up to date)
-#   ./dev-setup.sh --with-mobile   also install both Expo apps' dependencies
-#   ./dev-setup.sh --reset         DESTROY the local database first and rebuild it
-#   IP=192.168.1.40 ./dev-setup.sh use this LAN address instead of detecting it
+#   ./scripts/dev-setup.sh                 set up (or bring an existing checkout up to date)
+#   ./scripts/dev-setup.sh --with-mobile   also install both Expo apps' dependencies
+#   ./scripts/dev-setup.sh --reset         DESTROY the local database first and rebuild it
+#   IP=192.168.1.40 ./scripts/dev-setup.sh use this LAN address instead of detecting it
 #
 # Then:
-#   ./start.sh                     run everything
+#   ./scripts/start.sh                     run everything
 #
 # Re-running is safe: nothing is reinstalled that is already current, an
 # existing .env is never touched, migrations and seed are idempotent.
@@ -37,7 +37,7 @@
 #       8080-8085 (gateway + APIs), 5173-5176 (UIs), 5432, 9000, 9001, 1025, 8025
 #
 #   Optional — only for the features named
-#     cloudflared/ngrok   Razorpay webhooks reaching localhost (./start.sh --tunnel)
+#     cloudflared/ngrok   Razorpay webhooks reaching localhost (./scripts/start.sh --tunnel)
 #     Xcode / Android     the mobile apps (--with-mobile, then make -C infra mobile)
 #     Studio, Expo Go
 #
@@ -46,7 +46,8 @@
 # ---------------------------------------------------------------------------
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# The repository root: this script lives in scripts/.
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 WITH_MOBILE=0
@@ -143,11 +144,11 @@ if [ "$WITH_MOBILE" -eq 1 ]; then
     command -v xcrun >/dev/null 2>&1 || warn "Xcode not found — iOS simulator builds will not work (Expo Go on a phone still does)"
 fi
 
-[ "$missing" -eq 0 ] || die "install the prerequisites above, then run ./dev-setup.sh again"
+[ "$missing" -eq 0 ] || die "install the prerequisites above, then run ./scripts/dev-setup.sh again"
 
 # Ports. The infrastructure ones are FATAL now — a Homebrew Postgres on 5432
 # would make the Docker step fail with an unhelpful error — unless it is our
-# own container holding them. App ports only matter for ./start.sh.
+# own container holding them. App ports only matter for ./scripts/start.sh.
 blocked=""
 for port in 5432 9000 9001 1025 8025; do
     holder="$(lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null | awk 'NR==2{print $1}')"
@@ -164,13 +165,13 @@ for port in 8080 8081 8082 8083 8084 8085 5173 5174 5175 5176; do
     if lsof -nP -iTCP:"$port" -sTCP:LISTEN -t >/dev/null 2>&1; then busy="$busy $port"; fi
 done
 [ -z "$busy" ] && ok "app ports free" \
-    || warn "app ports in use:$busy — fine if it is this stack already running; otherwise free them before ./start.sh"
+    || warn "app ports in use:$busy — fine if it is this stack already running; otherwise free them before ./scripts/start.sh"
 
 # ---------------------------------------------------------------------------
 bold "2/7  Configuration (.env)"
 # ---------------------------------------------------------------------------
 # This machine's LAN address: what a phone on the same Wi-Fi (and presigned
-# image URLs) must use. IP=… overrides detection: IP=192.168.1.40 ./dev-setup.sh
+# image URLs) must use. IP=… overrides detection: IP=192.168.1.40 ./scripts/dev-setup.sh
 lan_ip() {
     if [ -n "${IP:-}" ]; then echo "$IP"; return; fi
     local ip="" iface
@@ -295,7 +296,7 @@ bold "6/7  Analytics backfill"
 # ---------------------------------------------------------------------------
 # The seed writes rows directly, so no events exist for them yet. These write
 # one snapshot event per existing supplier, product and order; the consumer
-# applies them when ./start.sh first runs it (the slot made above holds them).
+# applies them when ./scripts/start.sh first runs it (the slot made above holds them).
 # Re-running is harmless: the projections upsert.
 step "supplier snapshots" bash -c 'cd vm-profile-api && go run ./cmd/api -emit-snapshots'
 step "product snapshots"  bash -c 'cd vm-catalog-api && go run ./cmd/api -emit-snapshots'
@@ -316,7 +317,7 @@ cat <<EOF
 
 $(printf "\033[1m%s\033[0m" "Setup complete.") Start everything with:
 
-    ./start.sh
+    ${VAYAL_START_CMD:-./scripts/start.sh}
 
   Shop        http://localhost:5173
   Admin       http://localhost:5174
@@ -331,8 +332,8 @@ $(printf "\033[1m%s\033[0m" "Setup complete.") Start everything with:
     customer@vayal.test     customer
 
   Optional next steps:
-    • Payment webhooks: ./start.sh --tunnel (Razorpay cannot reach localhost)
-    • Mobile apps:   ./dev-setup.sh --with-mobile, then make -C infra mobile
+    • Payment webhooks: ${VAYAL_START_CMD:-./scripts/start.sh} --tunnel (Razorpay cannot reach localhost)
+    • Mobile apps:   ${VAYAL_SETUP_CMD:-./scripts/dev-setup.sh} --with-mobile, then ${VAYAL_MOBILE_CMD:-./scripts/start-mobile.sh}
     • Health check:  make -C infra doctor   (while nothing is running)
 
   Full log of this run: $LOG

@@ -6,6 +6,8 @@
 
 # Build output
 bin/
+# …except the Ubuntu scripts' lsof stand-in, which is source, not output.
+!infra/scripts/ubuntu/bin/
 dist/
 node_modules/
 *.tsbuildinfo
@@ -19,7 +21,7 @@ infra/.run/
 coverage.out
 
 # Pinned dev tools (air, goose, sqlc) downloaded by `make -C infra tools`:
-# platform binaries, rebuilt on every machine by ./dev-setup.sh.
+# platform binaries, rebuilt on every machine by ./scripts/dev-setup.sh.
 .tools/
 
 # Editors / OS

@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+#
+# A stand-in for `lsof`, used ONLY by the *-ubuntu.sh scripts (they put this
+# directory first on PATH). It answers the one question our scripts ask —
+# "what is listening on TCP port N?" — in the two forms they ask it:
+#
+#   lsof -nP -iTCP:<port> -sTCP:LISTEN        a COMMAND/PID table
+#   lsof -nP -iTCP:<port> -sTCP:LISTEN -t     PIDs only
+#
+# Why not the real lsof on Ubuntu: it is often not installed, and run as a
+# normal user it cannot see processes owned by other users — so a system
+# Postgres on 5432, or Docker's own port proxy, looks like a FREE port. `ss`
+# (iproute2, on every Ubuntu) sees every listening socket whoever owns it.
+#
+# Exit status matches lsof: 0 when something is listening, 1 when not.
+set -uo pipefail
+
+port="" pids_only=0
+for arg in "$@"; do
+    case "$arg" in
+        -iTCP:*) port="${arg#-iTCP:}" ;;
+        -t)      pids_only=1 ;;
+    esac
+done
+if [ -z "$port" ]; then
+    echo "this lsof stand-in only supports: lsof -nP -iTCP:<port> -sTCP:LISTEN [-t]" >&2
+    exit 2
+fi
+
+# Anything listening at all, any owner, IPv4 or IPv6.
+listening="$(ss -ltnH "sport = :$port" 2>/dev/null)"
+[ -n "$listening" ] || exit 1
+
+# Owning processes — visible for this user's own processes only, which are
+# the ones our scripts would ever stop.
+pids="$(ss -ltnpH "sport = :$port" 2>/dev/null | grep -oE 'pid=[0-9]+' | cut -d= -f2 | sort -u)"
+
+if [ "$pids_only" -eq 1 ]; then
+    [ -n "$pids" ] && echo "$pids"
+    exit 0
+fi
+
+echo "COMMAND PID USER"
+if [ -n "$pids" ]; then
+    for pid in $pids; do
+        echo "$(ps -o comm= -p "$pid" 2>/dev/null | cut -c1-9) $pid $(ps -o user= -p "$pid" 2>/dev/null)"
+    done
+elif docker ps --format '{{.Ports}}' 2>/dev/null | grep -qE "(^|[ ,])[0-9.:\[\]]*:${port}->"; then
+    # Docker publishes ports through a root-owned proxy; name it the way the
+    # real lsof does on macOS so "held by Docker" checks recognise it.
+    echo "docker-pr - root"
+else
+    # Listening, but owned by another user (typically a system service).
+    echo "another-user - ?"
+fi
+exit 0
