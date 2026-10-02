@@ -121,7 +121,7 @@ else
     PORT="$SUPPLIER_PORT"
     OTHER_PORT="$CUSTOMER_PORT"
     OTHER_HINT="./scripts/start-mobile.sh customer"
-    SIGN_IN_EMAIL="greens@vayal.test"
+    SIGN_IN_EMAIL="farm@vayal.test"
     SIGN_IN_VAR="SEED_SUPPLIER_PASSWORD"
     SIGN_IN_NOTE="This app is sign-in only."
 fi

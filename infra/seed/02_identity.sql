@@ -1,5 +1,5 @@
--- Development seed: one admin, one analyst, two approved suppliers, one
--- customer with two addresses.
+-- Development seed: one admin, one analyst, one approved supplier (Nilgiri
+-- Microfarms), one customer with two addresses.
 --
 -- Idempotent: every insert is ON CONFLICT DO NOTHING, so `make seed` can run
 -- repeatedly without duplicating rows or failing.
@@ -46,37 +46,14 @@ VALUES (
 ON CONFLICT (email) DO NOTHING;
 
 -- ---------------------------------------------------------------------------
--- Suppliers — both approved, so the storefront has produce to list
+-- Supplier — one, approved, with a FIXED id
+--
+-- Its catalogue (products, grades, packs, photos and a video) is seeded from
+-- mocks/suppliers/nilgiri-microfarms/ by `make seed`, which runs
+-- `vm-catalog-api -seed-mocks` after this file. That catalogue and its media
+-- object keys name this supplier by id, so the id is fixed rather than
+-- generated: every machine gets the same one.
 -- ---------------------------------------------------------------------------
-
-WITH new_user AS (
-    INSERT INTO profile.users (email, phone, password_hash, role, status, email_verified)
-    VALUES (
-        'greens@vayal.test',
-        '9800000001',
-        crypt(:'supplier_password', gen_salt('bf', 12)),
-        'supplier',
-        'active',
-        TRUE
-    )
-    ON CONFLICT (email) DO NOTHING
-    RETURNING id
-), admin_user AS (
-    SELECT id FROM profile.users WHERE email = :'admin_email'
-)
-INSERT INTO profile.suppliers (
-    user_id, business_name, contact_name, phone, email,
-    gstin, pan, address_line1, city, state, pincode,
-    bank_account_name, bank_account_number, bank_ifsc,
-    status, approved_by, approved_at
-)
-SELECT
-    new_user.id, 'Kaveri Greens', 'Anitha R', '9800000001', 'greens@vayal.test',
-    '33AABCK1234M1Z5', 'AABCK1234M', '12 Anna Salai', 'Coimbatore', 'Tamil Nadu', '641001',
-    'Kaveri Greens', '918273645500', 'HDFC0001234',
-    'approved', admin_user.id, now()
-FROM new_user, admin_user
-ON CONFLICT (user_id) DO NOTHING;
 
 WITH new_user AS (
     INSERT INTO profile.users (email, phone, password_hash, role, status, email_verified)
@@ -94,13 +71,13 @@ WITH new_user AS (
     SELECT id FROM profile.users WHERE email = :'admin_email'
 )
 INSERT INTO profile.suppliers (
-    user_id, business_name, contact_name, phone, email,
+    id, user_id, business_name, contact_name, phone, email,
     gstin, pan, address_line1, city, state, pincode,
     bank_account_name, bank_account_number, bank_ifsc,
     status, approved_by, approved_at
 )
 SELECT
-    new_user.id, 'Nilgiri Microfarms', 'Suresh K', '9800000002', 'farm@vayal.test',
+    'c0acc8b1-21cc-4038-a31a-68642b60fc2c', new_user.id, 'Nilgiri Microfarms', 'Suresh K', '9800000002', 'farm@vayal.test',
     '33AABCN5678P1Z2', 'AABCN5678P', '4 Market Road', 'Ooty', 'Tamil Nadu', '643001',
     'Nilgiri Microfarms', '918273645511', 'ICIC0005678',
     'approved', admin_user.id, now()

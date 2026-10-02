@@ -40,6 +40,8 @@ vayal-mikrogreenz/
   README.md
   scripts/                # the commands people run: dev-setup, start, start-mobile
                           # (macOS) and their -ubuntu wrappers
+  mocks/                  # development seed data SQL cannot hold: supplier catalogues
+                          # + their photos/videos (vm-catalog-api -seed-mocks)
   infra/                  # docker-compose, migrations runner, seed data, Makefile
   packages/
     vm-go-common/         # Go: config, logging, errors, auth middleware, db, money, ist-time

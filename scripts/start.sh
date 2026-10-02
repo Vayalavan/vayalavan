@@ -461,7 +461,6 @@ cat <<EOF
 
     admin@vayal.test        admin
     analyst@vayal.test      analyst — admin console, Analytics tab only
-    greens@vayal.test       supplier (Kaveri Greens)
     farm@vayal.test         supplier (Nilgiri Microfarms)
     customer@vayal.test     customer
 

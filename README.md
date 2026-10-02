@@ -59,6 +59,10 @@ stops with the fix if one is missing.
   `IP=192.168.1.40 ./scripts/dev-setup.sh` chooses the address yourself;
   `make -C infra mobile-ip` repoints an existing `.env` after a network change.
 
+**Seed data:** an admin, an analyst, a customer, and one supplier, **Nilgiri
+Microfarms**, with its full catalogue (6 products, their grades, packs, photos
+and a video) loaded from [`mocks/`](mocks/README.md).
+
 Re-running setup is safe: migrations and seed are idempotent. `--with-mobile`
 also installs the Expo apps, and `--reset` rebuilds the database from scratch.
 
@@ -1031,6 +1035,7 @@ vayal-mikrogreenz/
 │   ├── scripts/              # doctor, run, wait, seed, status; ubuntu/ helpers
 │   └── seed/                 # development seed data
 ├── scripts/                  # what people run: dev-setup, start, start-mobile (+ -ubuntu)
+├── mocks/                    # seed catalogue + media for Nilgiri Microfarms (see mocks/README.md)
 ├── packages/
 │   ├── vm-go-common/         # config, logging, httpx, db, migrate, money, isttime
 │   └── vm-ui-kit/            # logo, Tailwind preset, shell, API client

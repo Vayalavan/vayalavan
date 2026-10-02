@@ -171,8 +171,20 @@ migrate-status: ## Show applied and pending migrations per service
 		(cd $(ROOT_DIR)/$$svc && go run ./cmd/api -migrate status) || exit 1; \
 	done
 
-seed: ## Load development seed data
+seed: ## Load development seed data: accounts (SQL), then the mock catalogue (mocks/)
 	@$(SCRIPTS)/seed.sh
+	@# Products, grades, packs, photos and video for the seeded supplier, from
+	@# mocks/ — through vm-catalog-api's own code (MinIO upload + product save),
+	@# because SQL cannot upload a file. Idempotent: existing products are kept.
+	@echo "==> mock catalogue (mocks/suppliers/*/catalog.json)"
+	@log="$$(mktemp)"; \
+	if (cd $(ROOT_DIR)/vm-catalog-api && go run ./cmd/api -seed-mocks $(ROOT_DIR)/mocks) >"$$log" 2>&1; then \
+		grep -o '"msg":"mock catalogue seeded".*' "$$log" \
+			| sed -E 's/.*"created":([0-9]+).*"already_present":([0-9]+).*"files_uploaded":([0-9]+).*/  products created: \1, already present: \2, files uploaded: \3/'; \
+		rm -f "$$log"; \
+	else \
+		echo "  FAILED:"; tail -5 "$$log" | sed 's/^/    /'; rm -f "$$log"; exit 1; \
+	fi
 
 verify-storage: ## Prove presigned MinIO upload/download works end to end
 	@cd $(ROOT_DIR)/vm-catalog-api && go run ./cmd/api -verify-storage

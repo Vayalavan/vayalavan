@@ -51,6 +51,8 @@ const (
 	SourceCSVImport = "csv_import"
 	SourceAdmin     = "admin"
 	SourceBackfill  = "backfill"
+	// Created by the development seed (mocks/).
+	SourceSeed = "seed"
 )
 
 // Product is the analytics view of a product.

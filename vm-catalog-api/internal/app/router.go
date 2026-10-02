@@ -27,18 +27,7 @@ import (
 func NewRouter(
 	cfg Config, pool *pgxpool.Pool, store *storage.Client, logger *slog.Logger,
 ) http.Handler {
-	supplierClient := suppliers.NewClient(cfg.ProfileAPIURL, cfg.InternalToken, logger)
-
-	handlers := api.New(pool, store, supplierClient, api.Limits{
-		MaxImageBytes:          cfg.Limits.MaxImageBytes,
-		MaxVideoBytes:          cfg.Limits.MaxVideoBytes,
-		MaxMediaPerSizeCode:    cfg.Limits.MaxMediaPerSizeCode,
-		MaxSizeCodesPerProduct: cfg.Limits.MaxSizeCodesPerProduct,
-		MaxCSVBytes:            cfg.Limits.MaxCSVBytes,
-		MaxCSVRows:             cfg.Limits.MaxCSVRows,
-	}, api.Rates{
-		DefaultMarkupBPS: cfg.DefaultMarkupBPS,
-	}, logger)
+	handlers := NewAPI(cfg, pool, store, logger)
 
 	r := chi.NewRouter()
 
@@ -135,4 +124,21 @@ func NewRouter(
 	})
 
 	return r
+}
+
+// NewAPI builds the handlers with this service's configured limits and rates.
+// Shared by the router and by the development seed (cmd/api -seed-mocks), so
+// a seeded product is held to exactly the limits a real save is.
+func NewAPI(cfg Config, pool *pgxpool.Pool, store *storage.Client, logger *slog.Logger) *api.API {
+	supplierClient := suppliers.NewClient(cfg.ProfileAPIURL, cfg.InternalToken, logger)
+	return api.New(pool, store, supplierClient, api.Limits{
+		MaxImageBytes:          cfg.Limits.MaxImageBytes,
+		MaxVideoBytes:          cfg.Limits.MaxVideoBytes,
+		MaxMediaPerSizeCode:    cfg.Limits.MaxMediaPerSizeCode,
+		MaxSizeCodesPerProduct: cfg.Limits.MaxSizeCodesPerProduct,
+		MaxCSVBytes:            cfg.Limits.MaxCSVBytes,
+		MaxCSVRows:             cfg.Limits.MaxCSVRows,
+	}, api.Rates{
+		DefaultMarkupBPS: cfg.DefaultMarkupBPS,
+	}, logger)
 }

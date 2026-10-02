@@ -2013,6 +2013,35 @@ func (q *Queries) MarkCSVImportCommitted(ctx context.Context, arg MarkCSVImportC
 	return i, err
 }
 
+const productExistsForSupplier = `-- name: ProductExistsForSupplier :one
+
+SELECT EXISTS (
+    SELECT 1 FROM products
+    WHERE supplier_id = $1
+      AND lower(btrim(name)) = lower(btrim($2::text))
+      AND lower(coalesce(btrim(grade), '')) = lower(coalesce(btrim($3::text), ''))
+      AND status <> 'archived'
+) AS exists
+`
+
+type ProductExistsForSupplierParams struct {
+	SupplierID uuid.UUID
+	Name       string
+	Grade      *string
+}
+
+// ===========================================================================
+// development seed (mocks/)
+// ===========================================================================
+// The seed's idempotency check, in the same terms as the unique index
+// products_supplier_name_grade_key: a live product of this name and grade.
+func (q *Queries) ProductExistsForSupplier(ctx context.Context, arg ProductExistsForSupplierParams) (bool, error) {
+	row := q.db.QueryRow(ctx, productExistsForSupplier, arg.SupplierID, arg.Name, arg.Grade)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const productImagesForIDs = `-- name: ProductImagesForIDs :many
 
 SELECT DISTINCT ON (m.product_id)

@@ -643,3 +643,18 @@ SELECT id, created_at FROM products
 WHERE (created_at, id) > (sqlc.arg(after_created_at)::timestamptz, sqlc.arg(after_id)::uuid)
 ORDER BY created_at, id
 LIMIT sqlc.arg(page_size);
+
+-- ===========================================================================
+-- development seed (mocks/)
+-- ===========================================================================
+
+-- The seed's idempotency check, in the same terms as the unique index
+-- products_supplier_name_grade_key: a live product of this name and grade.
+-- name: ProductExistsForSupplier :one
+SELECT EXISTS (
+    SELECT 1 FROM products
+    WHERE supplier_id = $1
+      AND lower(btrim(name)) = lower(btrim(sqlc.arg(name)::text))
+      AND lower(coalesce(btrim(grade), '')) = lower(coalesce(btrim(sqlc.narg(grade)::text), ''))
+      AND status <> 'archived'
+) AS exists;

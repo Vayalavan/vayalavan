@@ -289,7 +289,7 @@ bold "5/7  Database"
 # migrate-up: analytics roles → every service's migrations in dependency order
 # → the analytics publication and replication slot (CLAUDE.md §5.4).
 step "roles, migrations, CDC publication + slot" make -C infra migrate-up
-step "seed data (admin, analyst, suppliers, customer, produce)" make -C infra seed
+step "seed: admin, analyst, customer, Nilgiri Microfarms + its catalogue (mocks/)" make -C infra seed
 
 # ---------------------------------------------------------------------------
 bold "6/7  Analytics backfill"
@@ -327,7 +327,6 @@ $(printf "\033[1m%s\033[0m" "Setup complete.") Start everything with:
   Seeded logins (passwords are the SEED_*_PASSWORD values in .env):
     $(env_value SEED_ADMIN_EMAIL)        admin
     $(env_value SEED_ANALYST_EMAIL)      analyst (admin console, Analytics tab only)
-    greens@vayal.test       supplier (Kaveri Greens)
     farm@vayal.test         supplier (Nilgiri Microfarms)
     customer@vayal.test     customer
 

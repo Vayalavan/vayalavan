@@ -1,0 +1,331 @@
+{
+  "supplier": {
+    "id": "c0acc8b1-21cc-4038-a31a-68642b60fc2c",
+    "business_name": "Nilgiri Microfarms",
+    "note": "The supplier row itself is created by infra/seed/02_identity.sql with this id; this file seeds its catalogue."
+  },
+  "products": [
+    {
+      "name": "Alphonso Mango",
+      "type": "fruit",
+      "grade": "Export",
+      "description": "Ratnagiri Alphonso",
+      "status": "active",
+      "markup_bps": 1000,
+      "media": [],
+      "size_codes": [
+        {
+          "code": "STD",
+          "meta": null,
+          "is_active": true,
+          "harvest_share_pct": null,
+          "media": [
+            {
+              "file": "media/alphonso-mango-std-1.png",
+              "kind": "image"
+            }
+          ],
+          "packs": [
+            {
+              "label": "10 Kg box",
+              "meta": null,
+              "weight_grams": 2500,
+              "price_paise": 620050,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Tomato",
+      "type": "vegetable",
+      "grade": "A",
+      "description": "Vine ripened and hand picked",
+      "status": "active",
+      "markup_bps": 500,
+      "media": [],
+      "size_codes": [
+        {
+          "code": "STD",
+          "meta": null,
+          "is_active": true,
+          "harvest_share_pct": null,
+          "media": [
+            {
+              "file": "media/tomato-std-1.png",
+              "kind": "image"
+            }
+          ],
+          "packs": [
+            {
+              "label": "1 kg",
+              "meta": null,
+              "weight_grams": 1000,
+              "price_paise": 4500,
+              "is_active": true
+            },
+            {
+              "label": "3 kg",
+              "meta": null,
+              "weight_grams": 3000,
+              "price_paise": 13050,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sunflower Microgreens",
+      "type": "microgreen",
+      "grade": "Premium",
+      "description": "Harvested the morning of delivery",
+      "status": "active",
+      "markup_bps": 500,
+      "media": [],
+      "size_codes": [
+        {
+          "code": "STD",
+          "meta": null,
+          "is_active": true,
+          "harvest_share_pct": null,
+          "media": [
+            {
+              "file": "media/sunflower-microgreens-std-1.png",
+              "kind": "image"
+            }
+          ],
+          "packs": [
+            {
+              "label": "100 g",
+              "meta": null,
+              "weight_grams": 100,
+              "price_paise": 12000,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pomegranate",
+      "type": "fruit",
+      "grade": "A",
+      "description": "We grow Super Bhagwa, a premium selection of India's Bhagwa pomegranate, because it gives the best fruit inside the skin. The arils are deep ruby red and full of juice, and the seeds are so soft that kids can eat a whole bowl without spitting anything out.\n\nGrade A, sorted by hand. Every fruit is checked for size, skin colour and weight before it's listed. We only sell fruit that feels heavy for its size, because heavier fruit has more juice inside. Fruit that doesn't make Grade A isn't listed here.",
+      "status": "active",
+      "markup_bps": 1000,
+      "media": [
+        {
+          "file": "media/pomegranate-1.png",
+          "kind": "image"
+        },
+        {
+          "file": "media/pomegranate-2.png",
+          "kind": "image"
+        },
+        {
+          "file": "media/pomegranate-3.png",
+          "kind": "image"
+        },
+        {
+          "file": "media/pomegranate-4.mp4",
+          "kind": "video"
+        }
+      ],
+      "size_codes": [
+        {
+          "code": "L",
+          "meta": "300 g - 350 g",
+          "is_active": true,
+          "harvest_share_pct": 8,
+          "media": [],
+          "packs": [
+            {
+              "label": "1 Kg Box",
+              "meta": "3 pieces",
+              "weight_grams": 1000,
+              "price_paise": 100000,
+              "is_active": true
+            },
+            {
+              "label": "1.5 Kg Box",
+              "meta": "4-5 pieces",
+              "weight_grams": 1500,
+              "price_paise": 150000,
+              "is_active": true
+            },
+            {
+              "label": "2 Kg Box",
+              "meta": "6-7 pieces",
+              "weight_grams": 2000,
+              "price_paise": 200000,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "code": "Jumbo",
+          "meta": "350+ g",
+          "is_active": true,
+          "harvest_share_pct": 2,
+          "media": [],
+          "packs": [
+            {
+              "label": "1 Kg Box",
+              "meta": "2-3 pieces",
+              "weight_grams": 1000,
+              "price_paise": 100000,
+              "is_active": true
+            },
+            {
+              "label": "1.5 Kg Box",
+              "meta": "4 pieces",
+              "weight_grams": 1500,
+              "price_paise": 150000,
+              "is_active": true
+            },
+            {
+              "label": "2 Kg Box",
+              "meta": "5-6 pieces",
+              "weight_grams": 2000,
+              "price_paise": 200000,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "code": "S",
+          "meta": "200 - 250 g",
+          "is_active": true,
+          "harvest_share_pct": 70,
+          "media": [],
+          "packs": [
+            {
+              "label": "1 Kg Box",
+              "meta": "4 - 5 pieces",
+              "weight_grams": 1000,
+              "price_paise": 40000,
+              "is_active": true
+            },
+            {
+              "label": "1.2 Kg Box",
+              "meta": "6 pieces",
+              "weight_grams": 1200,
+              "price_paise": 45000,
+              "is_active": true
+            }
+          ]
+        },
+        {
+          "code": "M",
+          "meta": "250 g - 300 g",
+          "is_active": true,
+          "harvest_share_pct": 20,
+          "media": [],
+          "packs": [
+            {
+              "label": "1 Kg Box",
+              "meta": "3-4 pieces",
+              "weight_grams": 1000,
+              "price_paise": 60000,
+              "is_active": true
+            },
+            {
+              "label": "1.5 Kg Box",
+              "meta": "5-6 pieces",
+              "weight_grams": 1500,
+              "price_paise": 65000,
+              "is_active": true
+            },
+            {
+              "label": "2 Kg Box",
+              "meta": "7-8 pieces",
+              "weight_grams": 2000,
+              "price_paise": 70000,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Chikoo",
+      "type": "fruit",
+      "grade": "A",
+      "description": "Chikoo grown and harvested in our gardern",
+      "status": "active",
+      "markup_bps": 500,
+      "media": [],
+      "size_codes": [
+        {
+          "code": "STD",
+          "meta": null,
+          "is_active": true,
+          "harvest_share_pct": null,
+          "media": [
+            {
+              "file": "media/chikoo-std-1.png",
+              "kind": "image"
+            }
+          ],
+          "packs": [
+            {
+              "label": "5 Kg",
+              "meta": null,
+              "weight_grams": 5000,
+              "price_paise": 120000,
+              "is_active": true
+            },
+            {
+              "label": "10 Kg",
+              "meta": null,
+              "weight_grams": 10000,
+              "price_paise": 230000,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Green Grapes",
+      "type": "vegetable",
+      "grade": "Premium",
+      "description": "Green grapes grown and harvested in a premium vineyard",
+      "status": "active",
+      "markup_bps": 500,
+      "media": [],
+      "size_codes": [
+        {
+          "code": "STD",
+          "meta": null,
+          "is_active": true,
+          "harvest_share_pct": null,
+          "media": [
+            {
+              "file": "media/green-grapes-std-1.png",
+              "kind": "image"
+            }
+          ],
+          "packs": [
+            {
+              "label": "3 Kg Box",
+              "meta": null,
+              "weight_grams": 3000,
+              "price_paise": 90000,
+              "is_active": true
+            },
+            {
+              "label": "5 Kg Box",
+              "meta": null,
+              "weight_grams": 5000,
+              "price_paise": 120000,
+              "is_active": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

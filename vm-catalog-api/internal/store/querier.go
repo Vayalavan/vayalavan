@@ -227,6 +227,12 @@ type Querier interface {
 	// Filtered on status so a double-submit commits exactly once.
 	MarkCSVImportCommitted(ctx context.Context, arg MarkCSVImportCommittedParams) (CsvImport, error)
 	// ===========================================================================
+	// development seed (mocks/)
+	// ===========================================================================
+	// The seed's idempotency check, in the same terms as the unique index
+	// products_supplier_name_grade_key: a live product of this name and grade.
+	ProductExistsForSupplier(ctx context.Context, arg ProductExistsForSupplierParams) (bool, error)
+	// ===========================================================================
 	// product_media
 	// ===========================================================================
 	// The cover photograph for products referenced by an order.

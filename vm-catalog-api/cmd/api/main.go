@@ -37,6 +37,8 @@ func run() error {
 		"run migrations (up|down|status) and exit instead of serving")
 	verifyStorage := flag.Bool("verify-storage", false,
 		"run the presigned upload/download self-test and exit")
+	seedMocks := flag.String("seed-mocks", "",
+		"development seed: create the products in <dir>/suppliers/*/catalog.json, uploading their media, then exit")
 	emitSnapshots := flag.Bool("emit-snapshots", false,
 		"backfill analytics: write one product.snapshot event per product, then exit")
 	flag.Parse()
@@ -91,6 +93,13 @@ func run() error {
 		return err
 	}
 	defer pool.Close()
+
+	if *seedMocks != "" {
+		res, err := app.NewAPI(cfg, pool, store, logger).SeedMocks(ctx, *seedMocks)
+		logger.InfoContext(ctx, "mock catalogue seeded", "created", res.Created,
+			"already_present", res.Skipped, "files_uploaded", res.Files)
+		return err
+	}
 
 	if *emitSnapshots {
 		count, err := analyticsevents.EmitSnapshots(ctx, pool)
