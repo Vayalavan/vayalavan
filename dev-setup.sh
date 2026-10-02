@@ -3,26 +3,30 @@
 # One-time (and safely repeatable) setup of a development machine.
 #
 # Takes a fresh copy of the repository to "./start.sh works": checks the
-# prerequisites, creates .env, installs every app's dependencies, starts
+# prerequisites, creates .env from test.env, installs every app's dependencies, starts
 # Postgres/MinIO/MailHog, provisions the database (schemas, roles, migrations,
 # analytics publication and slot), seeds it, and fills analytics from the seed.
 #
 #   ./dev-setup.sh                 set up (or bring an existing checkout up to date)
 #   ./dev-setup.sh --with-mobile   also install both Expo apps' dependencies
 #   ./dev-setup.sh --reset         DESTROY the local database first and rebuild it
+#   IP=192.168.1.40 ./dev-setup.sh use this LAN address instead of detecting it
 #
 # Then:
 #   ./start.sh                     run everything
 #
-# Re-running is safe: nothing is reinstalled that is already current, .env is
-# never overwritten (only variables it lacks are added), migrations and seed
-# are idempotent.
+# Re-running is safe: nothing is reinstalled that is already current, an
+# existing .env is never touched, migrations and seed are idempotent.
 #
 # ---------------------------------------------------------------------------
 # PREREQUISITES — install these first. The script checks each one and stops
 # with the fix if anything is missing.
 #
 #   Required
+#     test.env            at the repository root (committed). The team's
+#                         development settings, copied to .env. It holds NO
+#                         secrets — mail goes to MailHog and Razorpay keys are
+#                         placeholders. Real keys go in your own .env only.
 #     macOS or Linux, bash, curl, lsof
 #     Go 1.25+            https://go.dev/dl/          (brew install go)
 #     Node.js 20.12+      https://nodejs.org          (brew install node)  — npm ships with it
@@ -33,10 +37,6 @@
 #       8080-8085 (gateway + APIs), 5173-5176 (UIs), 5432, 9000, 9001, 1025, 8025
 #
 #   Optional — only for the features named
-#     Razorpay TEST keys  real checkout. Put them in .env (RAZORPAY_KEY_ID,
-#                         RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET and
-#                         VITE_RAZORPAY_KEY_ID). Without them the storefront
-#                         works but a payment cannot complete.
 #     cloudflared/ngrok   Razorpay webhooks reaching localhost (./start.sh --tunnel)
 #     Xcode / Android     the mobile apps (--with-mobile, then make -C infra mobile)
 #     Studio, Expo Go
@@ -107,6 +107,13 @@ case "$(uname -s)" in
     *) die "unsupported OS $(uname -s): use macOS or Linux (on Windows, WSL2)" ;;
 esac
 
+if [ -f test.env ] || [ -f .env ]; then
+    [ -f test.env ] && ok "test.env present" || ok "no test.env, but .env already exists"
+else
+    fail "test.env is missing from $ROOT — it is committed; restore it with: git checkout -- test.env"
+    missing=1
+fi
+
 need curl "install curl" && ok "curl"
 need lsof "brew install lsof / apt install lsof" && ok "lsof"
 
@@ -162,24 +169,90 @@ done
 # ---------------------------------------------------------------------------
 bold "2/7  Configuration (.env)"
 # ---------------------------------------------------------------------------
-if [ ! -f .env ]; then
-    cp .env.example .env
-    ok "created .env from .env.example (local-only development values)"
+# This machine's LAN address: what a phone on the same Wi-Fi (and presigned
+# image URLs) must use. IP=… overrides detection: IP=192.168.1.40 ./dev-setup.sh
+lan_ip() {
+    if [ -n "${IP:-}" ]; then echo "$IP"; return; fi
+    local ip="" iface
+    if command -v route >/dev/null 2>&1; then            # macOS
+        iface="$(route -n get default 2>/dev/null | awk '/interface: /{print $2; exit}')"
+        [ -n "$iface" ] && ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+    fi
+    if [ -z "$ip" ] && command -v ip >/dev/null 2>&1; then  # Linux
+        ip="$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for (i = 1; i < NF; i++) if ($i == "src") {print $(i + 1); exit}}')"
+    fi
+    if [ -z "$ip" ] && command -v ifconfig >/dev/null 2>&1; then
+        ip="$(ifconfig 2>/dev/null | awk '/inet /{if ($2 != "127.0.0.1") {print $2; exit}}')"
+    fi
+    echo "$ip"
+}
+
+# Private IPv4 addresses (10.x, 172.16-31.x, 192.168.x) used in SETTING lines
+# of a file — never comments, which carry example addresses.
+private_ips_in() {
+    grep -E '^[A-Z][A-Z0-9_]*=' "$1" \
+        | grep -oE '(10\.[0-9]{1,3}|192\.168|172\.(1[6-9]|2[0-9]|3[01]))\.[0-9]{1,3}\.[0-9]{1,3}' \
+        | sort -u || true
+}
+
+# Replace one exact address with another in setting lines only. "Exact": a
+# match inside a longer number (192.168.1.5 in 192.168.1.50) is left alone.
+replace_ip() {  # replace_ip <old> <new> <in-file> <out-file>
+    awk -v old="$1" -v new="$2" '
+        /^[A-Z][A-Z0-9_]*=/ {
+            out = ""; rest = $0
+            while ((i = index(rest, old)) > 0) {
+                before = (i > 1) ? substr(rest, i - 1, 1) : ""
+                after  = substr(rest, i + length(old), 1)
+                out = out substr(rest, 1, i - 1) \
+                      ((before !~ /[0-9.]/ && after !~ /[0-9]/) ? new : old)
+                rest = substr(rest, i + length(old))
+            }
+            print out rest; next
+        }
+        { print }' "$3" > "$4"
+}
+
+this_ip="$(lan_ip)"
+
+if [ -f .env ]; then
+    # Never overwritten: it may hold this developer's own changes. To start
+    # again from the team's settings, delete .env and re-run.
+    ok ".env already exists — left as it is (delete it and re-run to re-copy test.env)"
+    # The usual reason images stop loading after a move to another network.
+    stale="$(private_ips_in .env | grep -vxF "${this_ip:-none}" || true)"
+    if [ -n "$this_ip" ] && [ -n "$stale" ]; then
+        warn ".env points at $(echo $stale | tr '\n' ' ')but this machine is $this_ip — run: make -C infra mobile-ip"
+    fi
 else
-    # Never overwrite: it may hold the developer's own keys. Add only what a
-    # newer .env.example declares and this .env lacks — the usual cause of
-    # "it works on mine".
-    added=0
-    while IFS= read -r line; do
-        key="${line%%=*}"
-        if ! grep -qE "^${key}=" .env; then
-            [ "$added" -eq 0 ] && printf '\n# Added by dev-setup.sh on %s from .env.example\n' "$(date +%F)" >> .env
-            printf '%s\n' "$line" >> .env
-            added=$((added + 1))
-            warn "added missing $key"
+    # .env is test.env with the team member's LAN address swapped for this
+    # machine's, in every setting that uses one (today S3_ENDPOINT and
+    # MOBILE_API_BASE_URL, and any added later). test.env is only ever READ.
+    tmp="$(mktemp)"
+    cp test.env "$tmp"
+    source_ips="$(private_ips_in test.env)"
+    target="${this_ip:-localhost}"
+    for old in $source_ips; do
+        [ "$old" = "$target" ] && continue
+        replace_ip "$old" "$target" "$tmp" "$tmp.next" && mv "$tmp.next" "$tmp"
+    done
+    mv "$tmp" .env
+    ok "created .env from test.env"
+
+    if [ -z "$source_ips" ]; then
+        ok "test.env uses no LAN address — nothing to repoint"
+    else
+        changed="$(diff <(grep -E '^[A-Z][A-Z0-9_]*=' test.env) <(grep -E '^[A-Z][A-Z0-9_]*=' .env) \
+                   | grep '^>' | sed -E 's/^> ([A-Z0-9_]+)=.*/\1/' | tr '\n' ' ' || true)"
+        if [ -n "$this_ip" ]; then
+            ok "repointed $(echo $source_ips | tr '\n' ' ')→ $this_ip in: ${changed:-nothing (already this machine)}"
+        else
+            # localhost keeps the web apps (and their images) working; only a
+            # phone cannot reach it.
+            warn "could not detect this machine's LAN address — used localhost in: $changed"
+            warn "the web apps work; for the mobile apps run: make -C infra mobile-ip IP=<this machine's LAN IP>"
         fi
-    done < <(grep -E '^[A-Z][A-Z0-9_]*=' .env.example)
-    [ "$added" -eq 0 ] && ok ".env up to date with .env.example" || ok "added $added variable(s) to .env"
+    fi
 fi
 
 if grep -qE '^RAZORPAY_KEY_ID=rzp_test_placeholder' .env 2>/dev/null; then
@@ -258,7 +331,7 @@ $(printf "\033[1m%s\033[0m" "Setup complete.") Start everything with:
     customer@vayal.test     customer
 
   Optional next steps:
-    • Real checkout: add Razorpay TEST keys to .env, then ./start.sh --tunnel
+    • Payment webhooks: ./start.sh --tunnel (Razorpay cannot reach localhost)
     • Mobile apps:   ./dev-setup.sh --with-mobile, then make -C infra mobile
     • Health check:  make -C infra doctor   (while nothing is running)
 

@@ -26,9 +26,18 @@ git clone <repo> && cd vayal-mikrogreenz
 ```
 
 `./dev-setup.sh` lists its prerequisites at the top and stops with the fix if
-one is missing: **Go 1.25+, Node 20.12+, Docker (running), uv**. It is safe
-to re-run after pulling: it adds any new `.env` variables without touching
-your values, and migrations and seed are idempotent. `--with-mobile` also
+one is missing: **Go 1.25+, Node 20.12+, Docker (running), uv**. It creates
+`.env` by copying `test.env`, the team's committed development settings. Keep
+`test.env` free of secrets: mail goes to MailHog and the Razorpay keys are
+placeholders, so real keys belong only in your own `.env`, which stays
+gitignored. The script never modifies `test.env`, and an existing `.env` is
+left alone. While copying, it swaps the LAN
+address `test.env` was made on (used by `S3_ENDPOINT` and
+`MOBILE_API_BASE_URL`) for this machine's own, so product images and the
+mobile apps work there too. Set `IP=192.168.1.40 ./dev-setup.sh` to choose the
+address yourself. After moving to another network, `make -C infra mobile-ip`
+repoints an existing `.env`. It is safe to re-run after pulling: migrations
+and seed are idempotent. `--with-mobile` also
 installs the Expo apps; `--reset` rebuilds the database from scratch.
 
 The pieces it is made of still work on their own:
